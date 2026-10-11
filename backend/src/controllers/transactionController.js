@@ -105,7 +105,7 @@ export async function createAndDispenseTransaction(req, res) {
           const actualProfit = parseFloat((actualRevenue - actualCost).toFixed(2));
           const finalStatus = shortfall > 0.001 ? 'PARTIALLY_DISPENSED' : 'COMPLETED';
 
-          // Transactional Stock & Machine Update
+          // Transactional Stock, Bags & Machine Update
           await db.run('BEGIN TRANSACTION');
           try {
             await db.run(
@@ -115,10 +115,30 @@ export async function createAndDispenseTransaction(req, res) {
                 total_cost = ?,
                 profit = ?,
                 shortfall = ?,
-                status = ?
+                status = ?,
+                checkout_status = 'UNPAID'
                WHERE id = ?`,
               [actualQty, actualRevenue, actualCost, actualProfit, shortfall, finalStatus, txId]
             );
+
+            // Create individual bag records in transaction_bags table
+            for (let bIdx = 0; bIdx < bagsList.length; bIdx++) {
+              const bg = bagsList[bIdx];
+              const bagQty = bg.capacity;
+              const bagAmount = parseFloat((bagQty * sellingPrice).toFixed(2));
+              const bagId = `bag_${Date.now().toString(36)}_${bIdx + 1}`;
+
+              await db.run(
+                `INSERT INTO transaction_bags (
+                  id, transaction_id, bag_index, total_bags, net_quantity, unit,
+                  unit_price, final_amount, sticker_code, label_printed, printed_at, checkout_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, 'UNPAID')`,
+                [
+                  bagId, txId, bg.bagIndex, bg.totalBags, bagQty, product.unit,
+                  sellingPrice, bagAmount, bg.stickerCode
+                ]
+              );
+            }
 
             // Deduct stock server-side transactionally
             await db.run(
@@ -268,7 +288,103 @@ export async function getTransactionById(req, res) {
     if (!transaction) {
       return res.status(404).json({ success: false, error: 'Transaction not found' });
     }
-    return res.json({ success: true, transaction });
+    const bags = await db.all('SELECT * FROM transaction_bags WHERE transaction_id = ? ORDER BY bag_index ASC', [transaction.id]);
+    return res.json({ success: true, transaction, bags });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function getStickerDetails(req, res) {
+  try {
+    const db = await getDb();
+    const { stickerCode } = req.params;
+
+    // Check bag table first
+    const bag = await db.get('SELECT b.*, t.product_name, t.product_type FROM transaction_bags b JOIN transactions t ON b.transaction_id = t.id WHERE b.sticker_code = ?', [stickerCode]);
+    if (bag) {
+      return res.json({ success: true, type: 'BAG', bag });
+    }
+
+    const tx = await db.get('SELECT * FROM transactions WHERE sticker_code = ?', [stickerCode]);
+    if (tx) {
+      return res.json({ success: true, type: 'TRANSACTION', transaction: tx });
+    }
+
+    return res.status(404).json({ success: false, error: 'Sticker code not found in database' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function processPosCheckout(req, res) {
+  try {
+    const db = await getDb();
+    const { stickerCode, posTerminalId = 'COUNTER_POS_01' } = req.body;
+
+    if (!stickerCode) {
+      return res.status(400).json({ success: false, error: 'Sticker code is required' });
+    }
+
+    const bag = await db.get('SELECT * FROM transaction_bags WHERE sticker_code = ?', [stickerCode]);
+
+    if (!bag) {
+      return res.status(404).json({ success: false, error: 'Sticker tag not found' });
+    }
+
+    if (bag.checkout_status === 'PAID') {
+      return res.status(400).json({
+        success: false,
+        error: `Sticker ${stickerCode} has ALREADY been scanned and paid at checkout! Prevented duplicate checkout.`
+      });
+    }
+
+    await db.run('BEGIN TRANSACTION');
+    try {
+      await db.run(
+        `UPDATE transaction_bags SET checkout_status = 'PAID', paid_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [bag.id]
+      );
+
+      // Check if all bags for this transaction are paid
+      const unpaidBags = await db.get(
+        `SELECT COUNT(*) as count FROM transaction_bags WHERE transaction_id = ? AND checkout_status != 'PAID'`,
+        [bag.transaction_id]
+      );
+
+      if (unpaidBags.count === 0) {
+        await db.run(
+          `UPDATE transactions SET checkout_status = 'PAID' WHERE id = ?`,
+          [bag.transaction_id]
+        );
+      } else {
+        await db.run(
+          `UPDATE transactions SET checkout_status = 'CHECKOUT_SCANNED' WHERE id = ?`,
+          [bag.transaction_id]
+        );
+      }
+
+      await db.run('COMMIT');
+
+      if (req.io) {
+        req.io.emit('checkout_payment_updated', {
+          stickerCode,
+          transactionId: bag.transaction_id,
+          posTerminalId,
+          status: 'PAID'
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: `Sticker ${stickerCode} checkout marked PAID successfully at counter`,
+        bagId: bag.id,
+        amountCollected: bag.final_amount
+      });
+    } catch (err) {
+      await db.run('ROLLBACK');
+      throw err;
+    }
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

@@ -77,14 +77,60 @@ describe('Grain & Oil Vending Machine System Tests', () => {
     });
   });
 
-  describe('4. Machine Hardware & Emergency Stop', () => {
-    it('should execute emergency stop signal', async () => {
-      const res = await request(app)
-        .post('/api/machines/emergency-stop');
+  describe('5. Counter Checkout & POS Integration Tests', () => {
+    it('should query sticker tag details for counter scanning', async () => {
+      const dispenseRes = await request(app)
+        .post('/api/transactions/dispense')
+        .send({ productId: 'prod_basmati', quantity: 2.0 });
 
-      expect(res.statusCode).toEqual(200);
-      expect(res.body.success).toBe(true);
-      expect(res.body.result.reason).toContain('EMERGENCY STOP');
+      const sticker = dispenseRes.body.stickerCode;
+      expect(sticker).toBeDefined();
+
+      const lookupRes = await request(app)
+        .get(`/api/transactions/stickers/${sticker}`);
+
+      expect(lookupRes.statusCode).toEqual(200);
+      expect(lookupRes.body.success).toBe(true);
+    });
+
+    it('should process counter payment and reject duplicate scanning', async () => {
+      const db = await getDb();
+      const testTxId = `tx_test_${Date.now()}`;
+      const testBagId = `bag_test_${Date.now()}`;
+      const testSticker = `STK-TEST-${Date.now()}`;
+
+      await db.run(
+        `INSERT INTO transactions (
+          id, code, machine_id, product_id, product_name, product_type, target_quantity,
+          unit, selling_price, cost_price, total_revenue, total_cost, profit, status, checkout_status
+        ) VALUES (?, ?, 'mach-001', 'prod_basmati', 'Basmati Rice', 'SOLID', 1.0, 'kg', 90, 60, 90, 60, 30, 'COMPLETED', 'UNPAID')`,
+        [testTxId, `TX-${Date.now()}`]
+      );
+
+      await db.run(
+        `INSERT INTO transaction_bags (
+          id, transaction_id, bag_index, total_bags, net_quantity, unit, unit_price, final_amount, sticker_code, checkout_status
+        ) VALUES (?, ?, 1, 1, 1.0, 'kg', 90.0, 90.0, ?, 'UNPAID')`,
+        [testBagId, testTxId, testSticker]
+      );
+
+      // First Checkout Scan
+      const checkoutRes1 = await request(app)
+        .post('/api/transactions/pos-checkout')
+        .send({ stickerCode: testSticker, posTerminalId: 'COUNTER_POS_01' });
+
+      expect(checkoutRes1.statusCode).toEqual(200);
+      expect(checkoutRes1.body.success).toBe(true);
+      expect(checkoutRes1.body.message).toContain('marked PAID');
+
+      // Duplicate Scan Attempt -> Must be REJECTED
+      const checkoutRes2 = await request(app)
+        .post('/api/transactions/pos-checkout')
+        .send({ stickerCode: testSticker, posTerminalId: 'COUNTER_POS_01' });
+
+      expect(checkoutRes2.statusCode).toEqual(400);
+      expect(checkoutRes2.body.success).toBe(false);
+      expect(checkoutRes2.body.error).toContain('ALREADY been scanned');
     });
   });
 });

@@ -33,6 +33,8 @@ router.get('/inventory/history', authenticateToken, authorizeRoles('SHOP_OWNER',
 // Transaction & Dispense Routes
 router.post('/transactions/dispense', transactionController.createAndDispenseTransaction);
 router.get('/transactions', authenticateToken, authorizeRoles('SHOP_OWNER', 'ADMIN'), transactionController.getTransactions);
+router.get('/transactions/stickers/:stickerCode', transactionController.getStickerDetails);
+router.post('/transactions/pos-checkout', transactionController.processPosCheckout);
 router.get('/transactions/:id', transactionController.getTransactionById);
 
 // Analytics Routes (Admin Protected)

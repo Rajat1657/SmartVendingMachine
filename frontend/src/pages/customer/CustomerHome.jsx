@@ -50,6 +50,32 @@ export const CustomerHome = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Socket.io real-time product price and stock updates
+  const { socket } = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleProductUpdated = (data) => {
+      console.log('[WS] Real-time product update received:', data);
+      fetchInitialData();
+
+      // If customer is configuring an active order and product price changed, warn them
+      if (activeProduct && data.product && data.product.id === activeProduct.id) {
+        if (data.product.selling_price !== activeProduct.selling_price) {
+          alert(`Notice: The price for ${data.product.name} was updated to ₹${data.product.selling_price}/${data.product.unit}. Please review your order.`);
+          setActiveProduct(data.product);
+        } else {
+          setActiveProduct(data.product);
+        }
+      }
+    };
+
+    socket.on('product_updated', handleProductUpdated);
+    return () => {
+      socket.off('product_updated', handleProductUpdated);
+    };
+  }, [socket, activeProduct]);
+
   const fetchInitialData = async () => {
     try {
       setLoading(true);

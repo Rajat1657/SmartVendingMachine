@@ -10,6 +10,7 @@ export async function seedDatabase() {
   await db.exec(`
     DELETE FROM alerts;
     DELETE FROM inventory_adjustments;
+    DELETE FROM transaction_bags;
     DELETE FROM transactions;
     DELETE FROM products;
     DELETE FROM categories;

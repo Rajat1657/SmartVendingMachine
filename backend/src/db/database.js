@@ -89,12 +89,32 @@ async function initSchema(db) {
       total_cost REAL NOT NULL,
       profit REAL NOT NULL,
       status TEXT NOT NULL CHECK(status IN ('PENDING', 'DISPENSING', 'COMPLETED', 'FAILED', 'CANCELLED', 'PARTIALLY_DISPENSED')),
+      checkout_status TEXT NOT NULL DEFAULT 'UNPAID' CHECK(checkout_status IN ('UNPAID', 'CHECKOUT_SCANNED', 'PAID', 'CANCELLED')),
       shortfall REAL DEFAULT 0.0,
       error_reason TEXT,
       sticker_code TEXT,
+      pos_barcode_strategy TEXT DEFAULT 'EAN13_TEST',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (product_id) REFERENCES products(id),
       FOREIGN KEY (machine_id) REFERENCES machines(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS transaction_bags (
+      id TEXT PRIMARY KEY,
+      transaction_id TEXT NOT NULL,
+      bag_index INTEGER NOT NULL,
+      total_bags INTEGER NOT NULL,
+      net_quantity REAL NOT NULL,
+      unit TEXT NOT NULL,
+      unit_price REAL NOT NULL,
+      final_amount REAL NOT NULL,
+      sticker_code TEXT UNIQUE NOT NULL,
+      label_printed INTEGER DEFAULT 0,
+      printed_at DATETIME,
+      checkout_status TEXT NOT NULL DEFAULT 'UNPAID' CHECK(checkout_status IN ('UNPAID', 'CHECKOUT_SCANNED', 'PAID')),
+      paid_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (transaction_id) REFERENCES transactions(id)
     );
 
     CREATE TABLE IF NOT EXISTS inventory_adjustments (
@@ -117,4 +137,19 @@ async function initSchema(db) {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Migration checks for existing databases
+  try {
+    const columns = await db.all(`PRAGMA table_info(transactions);`);
+    const hasCheckoutStatus = columns.some(c => c.name === 'checkout_status');
+    if (!hasCheckoutStatus) {
+      await db.exec(`ALTER TABLE transactions ADD COLUMN checkout_status TEXT NOT NULL DEFAULT 'UNPAID';`);
+    }
+    const hasPosStrategy = columns.some(c => c.name === 'pos_barcode_strategy');
+    if (!hasPosStrategy) {
+      await db.exec(`ALTER TABLE transactions ADD COLUMN pos_barcode_strategy TEXT DEFAULT 'EAN13_TEST';`);
+    }
+  } catch (err) {
+    console.log('Migration check info:', err.message);
+  }
 }
