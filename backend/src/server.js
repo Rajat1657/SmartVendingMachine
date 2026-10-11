@@ -37,9 +37,6 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve static image uploads
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
 app.use((req, res, next) => {
   req.io = io;
   next();
@@ -48,9 +45,28 @@ app.use((req, res, next) => {
 // Mount REST API
 app.use('/api', apiRoutes);
 
+// Serve static image uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Serve static frontend production build
+const frontendDistPath = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(frontendDistPath));
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString(), machine: simulatedMachine.status });
+});
+
+// SPA fallback handler: serve index.html for all non-API GET requests
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  res.sendFile(path.join(frontendDistPath, 'index.html'), (err) => {
+    if (err) {
+      res.status(500).send('Frontend build index.html not found. Please run npm run build in frontend directory.');
+    }
+  });
 });
 
 // Socket.io connection handling
