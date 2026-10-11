@@ -1,0 +1,47 @@
+@import '@fontsource/plus-jakarta-sans/400.css';
+@import '@fontsource/plus-jakarta-sans/500.css';
+@import '@fontsource/plus-jakarta-sans/600.css';
+@import '@fontsource/plus-jakarta-sans/700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-brand-background text-brand-text font-sans antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-brand-primary text-white font-semibold py-3 px-6 rounded-xl shadow-sm hover:shadow-md hover:bg-[#122e25] transition-all;
+  }
+  .btn-secondary {
+    @apply bg-brand-secondary text-brand-primary font-semibold py-3 px-6 rounded-xl shadow-sm hover:bg-[#c9d6c3] transition-all;
+  }
+  .btn-accent {
+    @apply bg-brand-accent text-white font-semibold py-3 px-6 rounded-xl shadow-sm hover:bg-[#c29135] transition-all;
+  }
+  .card {
+    @apply bg-brand-surface rounded-2xl shadow-sm border border-brand-secondary/50;
+  }
+  .input-field {
+    @apply bg-brand-surface border border-brand-secondary text-brand-text text-lg rounded-xl focus:ring-2 focus:ring-brand-primary focus:border-transparent block w-full p-3 transition-shadow;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-brand-background;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-brand-secondary rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-brand-primary;
+}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <rect width="512" height="512" rx="128" fill="#e0e5ec"/>
+  <rect x="32" y="32" width="448" height="448" rx="100" fill="#e0e5ec" stroke="#ffffff" stroke-width="8"/>
+  <g transform="translate(128, 110)">
+    <path d="M128 40 C140 100, 220 120, 220 190 C220 250, 175 290, 128 290 C81 290, 36 250, 36 190 C36 120, 116 100, 128 40 Z" fill="#2563eb"/>
+    <path d="M128 90 C120 130, 70 170, 70 210 C70 245, 96 265, 128 265 C160 265, 186 245, 186 210 C186 170, 136 130, 128 90 Z" fill="#60a5fa" opacity="0.8"/>
+  </g>
+  <text x="256" y="440" font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="52" fill="#1e293b" text-anchor="middle" letter-spacing="4">NOURISH</text>
+</svg>

@@ -1,0 +1,37 @@
+{
+  "short_name": "Nourish",
+  "name": "Nourish Shopkeeper Portal",
+  "description": "Smart Grain & Oil Vending Machine Shopkeeper Portal for Remote Monitoring, Inventory, Sales Analytics and Refill Management.",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#e0e5ec",
+  "background_color": "#e0e5ec",
+  "categories": ["business", "shopping", "utilities"]
+}
